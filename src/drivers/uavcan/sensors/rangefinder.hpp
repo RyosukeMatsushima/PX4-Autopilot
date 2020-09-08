@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,48 +31,46 @@
  *
  ****************************************************************************/
 
+/**
+ * @author RJ Gritter <rjgritter657@gmail.com>
+ */
+
 #pragma once
 
-#include <drivers/drv_hrt.h>
+#include "sensor_bridge.hpp"
+#include <drivers/drv_range_finder.h>
+#include <uORB/topics/distance_sensor.h>
+#include <drivers/rangefinder/PX4Rangefinder.hpp>
 
-#ifdef __PX4_NUTTX
-#include <sched.h>
-#include <px4_platform/cpuload.h>
-#endif /* __PX4_NUTTX */
+#include <uavcan/equipment/range_sensor/Measurement.hpp>
 
-namespace px4
+class UavcanRangefinderBridge : public UavcanCDevSensorBridgeBase
 {
-namespace logger
-{
+public:
+	static const char *const NAME;
 
-struct watchdog_data_t {
-#ifdef __PX4_NUTTX
-	int logger_main_task_index = -1;
-	int logger_writer_task_index = -1;
-	hrt_abstime ready_to_run_timestamp = hrt_absolute_time();
-	uint8_t last_state = TSTATE_TASK_INVALID;
-#endif /* __PX4_NUTTX */
+	UavcanRangefinderBridge(uavcan::INode &node);
+
+	const char *get_name() const override { return NAME; }
+
+	int init() override;
+
+private:
+
+	int init_driver(uavcan_bridge::Channel *channel) override;
+
+	void range_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::range_sensor::Measurement> &msg);
+
+	typedef uavcan::MethodBinder < UavcanRangefinderBridge *,
+		void (UavcanRangefinderBridge::*)
+		(const uavcan::ReceivedDataStructure<uavcan::equipment::range_sensor::Measurement> &) >
+		RangeCbBinder;
+
+	uavcan::Subscriber<uavcan::equipment::range_sensor::Measurement, RangeCbBinder> _sub_range_data;
+
+	float _range_min_m{0.0f};
+	float _range_max_m{0.0f};
+
+	bool _inited{false};
+
 };
-
-
-/**
- * Initialize the watchdog, fill in watchdog_data.
- */
-void watchdog_initialize(const pid_t pid_logger_main, const pthread_t writer_thread, watchdog_data_t &watchdog_data);
-
-/**
- * Update the watchdog and trigger it if necessary. It is triggered when the log writer task is in
- * ready state for a certain period of time, but did not get scheduled. It means that most likely
- * some other higher-prio task runs busy.
- * When the watchdog triggers, it boosts the priority of the logger's main & writer tasks to maximum, so
- * that they get scheduled again.
- *
- * Expected to be called from IRQ context.
- *
- * @param watchdog_data
- * @return true if watchdog is triggered, false otherwise
- */
-bool watchdog_update(watchdog_data_t &watchdog_data);
-
-} //namespace logger
-} //namespace px4
