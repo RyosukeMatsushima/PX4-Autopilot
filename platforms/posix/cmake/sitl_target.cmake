@@ -115,6 +115,7 @@ set(models
 	iris_opt_flow_mockup
 	iris_rplidar
 	iris_vision
+	iris_sextuple_depth_camera
 	nxp_cupcar
 	plane
 	plane_cam
